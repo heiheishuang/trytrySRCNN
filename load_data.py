@@ -6,8 +6,8 @@ import cv2
 from torch.utils.data import Dataset
 
 
-def transformImg(lr_path, lr):
-    img = cv2.imread(os.path.join(lr_path, lr))
+def transformImg(dir_path, file_path):
+    img = cv2.imread(os.path.join(dir_path, file_path))
     img = np.array(img).astype(np.uint8)
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     return img
@@ -62,14 +62,12 @@ class SRGanTrainDataset(Dataset):
         if self.in_memory:
             gt = self.gt_img[item].astype(np.float32)
             lr = self.lr_img[item].astype(np.float32)
-
         else:
             gt = transformImg(self.gt_path, self.gt_img[item]).astype(np.float32)
             lr = transformImg(self.lr_path, self.lr_img[item]).astype(np.float32)
 
         img_item['lr'] = lr
         img_item['gt'] = gt
-        # print(img_item['lr'].shape, img_item['gt'].shape)
 
         if self.transform is not None:
             img_item = self.transform(img_item)
@@ -116,8 +114,6 @@ class Crop(object):
     def __call__(self, sample):
         lr_img, gt_img = sample['lr'], sample['gt']
         ih, iw = lr_img.shape[:2]
-        # print("crop gtimg" + str(gt_img.shape))
-        # print("crop lrimg" + str(lr_img.shape))
 
         ix = random.randrange(0, iw - self.patch_size + 1)
         iy = random.randrange(0, ih - self.patch_size + 1)
@@ -127,6 +123,5 @@ class Crop(object):
 
         lr_patch = lr_img[iy: iy + self.patch_size, ix: ix + self.patch_size]
         gt_patch = gt_img[ty: ty + (self.scale * self.patch_size), tx: tx + (self.scale * self.patch_size)]
-        print("gt_patch" + str(gt_patch.shape))
 
         return {'lr': lr_patch, 'gt': gt_patch}
