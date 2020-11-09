@@ -10,7 +10,7 @@ from torch.utils.data.dataloader import DataLoader
 
 from models import NetSrcnn
 from utils import AverageMeter, img_psnr
-from load_data import TrainDataset, TestDataset
+from load_data import SRCnnTrainDataset, SRCnnTestDataset
 
 # Init the param
 parser = argparse.ArgumentParser()
@@ -30,7 +30,7 @@ if not os.path.exists(args.outputs_dir):
     os.makedirs(args.outputs_dir)
 
 # Load the dataset
-train_dataset = TrainDataset(args.train_file)
+train_dataset = SRCnnTrainDataset(args.train_file)
 train_dataloader = DataLoader(dataset=train_dataset,
                               batch_size=args.batch_size,
                               shuffle=True,
@@ -38,7 +38,7 @@ train_dataloader = DataLoader(dataset=train_dataset,
                               pin_memory=True,
                               drop_last=True)
 
-test_dataset = TestDataset(args.eval_file)
+test_dataset = SRCnnTestDataset(args.eval_file)
 test_dataloader = DataLoader(dataset=test_dataset, batch_size=1)
 
 # Use in the cuda
@@ -72,6 +72,8 @@ for epoch in range(args.num_epochs):
             labels = labels.to(device)
 
             preds = net(inputs)
+            print(preds.shape)
+            print(labels.shape)
 
             loss = mse_loss(preds, labels)
 

@@ -2,10 +2,6 @@ from torch import nn
 import torch.nn.functional as F
 
 
-def swish(x):
-    return x * F.sigmoid(x)
-
-
 class NetSrcnn(nn.Module):
     def __init__(self, num_channels=1):
         super(NetSrcnn, self).__init__()
@@ -39,7 +35,7 @@ class ResidualBlock(nn.Module):
 class UpsampleBlock(nn.Module):
     def __init__(self, in_channels, out_channels):
         super(UpsampleBlock, self).__init__()
-        self.conv = nn.Conv2d(in_channels, out_channels, 3, stride=1, padding=1)
+        self.conv = nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=1, padding=1)
         self.shuffler = nn.PixelShuffle(2)
         self.pr = nn.PReLU()
 
@@ -48,24 +44,24 @@ class UpsampleBlock(nn.Module):
 
 
 class SRResNet(nn.Module):
-    def __init__(self, n_residual_blocks, upsample_factor):
+    def __init__(self, n_residual_blocks, upsample_factor=1):
         super(SRResNet, self).__init__()
         self.n_residual_blocks = n_residual_blocks
         self.upsample_factor = upsample_factor
 
-        self.conv1 = nn.Conv2d(3, 64, 9, stride=1, padding=4)
+        self.conv1 = nn.Conv2d(3, 64, kernel_size=9, stride=1, padding=4)
         self.pr1 = nn.PReLU()
 
         for i in range(self.n_residual_blocks):
             self.add_module('residual_block' + str(i + 1), ResidualBlock())
 
-        self.conv2 = nn.Conv2d(64, 64, 3, stride=1, padding=1)
+        self.conv2 = nn.Conv2d(64, 64, kernel_size=3, stride=1, padding=1)
         self.bn2 = nn.BatchNorm2d(64)
 
-        for i in range(self.upsample_factor / 2):
+        for i in range(self.upsample_factor // 2):
             self.add_module('upsample' + str(i + 1), UpsampleBlock(64, 256))
 
-        self.conv3 = nn.Conv2d(64, 3, 9, stride=1, padding=4)
+        self.conv3 = nn.Conv2d(64, 3, kernel_size=9, stride=1, padding=4)
 
     def forward(self, x):
         x = self.pr1(self.conv1(x))
@@ -77,9 +73,7 @@ class SRResNet(nn.Module):
         f = self.bn2(self.conv2(y))
         x = f + x
 
-        for i in range(self.upsample_factor / 2):
+        for i in range(self.upsample_factor // 2):
             x = self.__getattr__('upsample' + str(i + 1))(x)
 
         return self.conv3(x)
-
-
