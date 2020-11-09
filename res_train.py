@@ -11,7 +11,7 @@ from torch.utils.data.dataloader import DataLoader
 
 from models import SRResNet
 from utils import AverageMeter, img_psnr
-from load_data import SRGanTrainDataset, SRGanTestDataset, Crop
+from load_data import SRGanDataset, Crop
 
 # Init the param
 parser = argparse.ArgumentParser()
@@ -29,13 +29,13 @@ parser.add_argument('--num-workers', type=int, default=8)
 parser.add_argument('--seed', type=int, default=123)
 args = parser.parse_args()
 
-torch.manual_seed(666)
+torch.manual_seed(args.seed)
 if not os.path.exists(args.outputs_dir):
     os.makedirs(args.outputs_dir)
 
 # Load the dataset
 transform = transforms.Compose([Crop(args.scale, args.patch_size)])
-train_dataset = SRGanTrainDataset(args.lr_file, args.gt_file, in_memory=True, transform=transform)
+train_dataset = SRGanDataset(args.lr_file, args.gt_file, in_memory=True, transform=transform)
 train_dataloader = DataLoader(dataset=train_dataset,
                               batch_size=args.batch_size,
                               shuffle=True,
@@ -43,9 +43,7 @@ train_dataloader = DataLoader(dataset=train_dataset,
                               pin_memory=True,
                               drop_last=True)
 
-# test_dataset = SRGanTestDataset(args.eval_file)
-# test_dataloader = DataLoader(dataset=test_dataset, batch_size=1)
-test_dataset = SRGanTrainDataset(args.test_lr_file, args.test_gt_file)
+test_dataset = SRGanDataset(args.test_lr_file, args.test_gt_file, in_memory=True, transform=transform)
 test_dataloader = DataLoader(dataset=test_dataset, batch_size=1)
 
 # Use in the cuda
@@ -53,7 +51,7 @@ cudnn.benchmark = True
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 # Defined the network
-net = SRResNet(16, 4).to(device)
+net = SRResNet(16, args.scale).to(device)
 optimizer = optim.Adam(net.parameters())
 
 # Define the loss func
@@ -78,8 +76,6 @@ for epoch in range(args.num_epochs):
 
             preds = net(inputs)
 
-            print(preds.shape)
-            print(labels.shape)
             loss = mse_loss(preds, labels)
 
             epoch_losses.update(loss.item(), len(inputs))

@@ -41,9 +41,9 @@ class SRCnnTestDataset(Dataset):
             return len(f['lr'])
 
 
-class SRGanTrainDataset(Dataset):
+class SRGanDataset(Dataset):
     def __init__(self, lr_path, gt_path, in_memory=True, transform=None):
-        super(SRGanTrainDataset, self).__init__()
+        super(SRGanDataset, self).__init__()
 
         self.lr_path = lr_path
         self.gt_path = gt_path
@@ -76,31 +76,6 @@ class SRGanTrainDataset(Dataset):
         img_item['gt'] = img_item['gt'].transpose(2, 0, 1).astype(np.float32) / 255.
 
         return img_item['lr'], img_item['gt']
-
-    def __len__(self):
-        return len(self.lr_img)
-
-
-class SRGanTestDataset(Dataset):
-    def __init__(self, lr_path, in_memory=True):
-        super(SRGanTestDataset, self).__init__()
-
-        self.lr_path = lr_path
-        self.in_memory = in_memory
-
-        self.lr_img = sorted(os.listdir(lr_path))
-
-        if in_memory:
-            self.lr_img = [transformImg(self.lr_path, lr) for lr in self.lr_img]
-
-    def __getitem__(self, item):
-        if self.in_memory:
-            lr = self.lr_img[item].astype(np.float32)
-
-        else:
-            lr = transformImg(self.lr_path, self.lr_img[item]).astype(np.float32)
-
-        return lr / 255.
 
     def __len__(self):
         return len(self.lr_img)
