@@ -13,53 +13,61 @@ from utils import img_psnr
 # Define the param
 parser = argparse.ArgumentParser()
 parser.add_argument('--weights-file', type=str, required=True)
-parser.add_argument('--lr-dir', type=str, required=True)
-parser.add_argument('--gt-dir', type=str, required=True)
+parser.add_argument('--lr-file', type=str, required=True)
+parser.add_argument('--gt-file', type=str, required=True)
 parser.add_argument('--scale', type=int, default=True)
 args = parser.parse_args()
 
 # Using the cuda
 cudnn.benchmark = True
-device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-
-# Define the net
-model = SRResNet(16, args.scale).to(device)
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # Load the param
+dataset = SRGanDataset(gt_path=args.gt_file, lr_path=args.lr_file, in_memory=False, transform=None)
+loader = DataLoader(dataset, batch_size=1, shuffle=False, num_workers=8)
+
+# Define the net
+model = SRResNet(16, args.scale)
 model.load_state_dict(torch.load(args.weights_file))
+model = model.to(device)
 model.eval()
-
-test_dataset = SRGanDataset(args.lr_dir, args.gt_dir, in_memory=True, transform=None)
-test_dataloader = DataLoader(dataset=test_dataset, batch_size=1)
-
-# Bicubic
-# cv2.imwrite("./data/" + "bicubic.bmp", img)
 
 index = 0
 with torch.no_grad():
-    for data in test_dataloader:
+    for data in loader:
         index = index + 1
-        inputs, labels = data
+        lr, gt = data
 
-        inputs = inputs.to(device)
-        labels = labels.to(device)
+        lr = lr.to(device)
+        gt = gt.to(device)
 
-        bs, c, h, w = inputs.size()
-        gt = labels[:, :, : h * args.scale, : w * args.scale]
+        _, _, height, weight = lr.size()
+        gt = gt[:, :, : height * args.scale, : weight * args.scale]
 
-        output = model(inputs)
+        output = model(lr)
+
         output = output[0].cpu().numpy()
+
+        output[output > 1.0] = 1.0
+        output[output < 0.0] = 0.0
         gt = gt[0].cpu().numpy()
 
         output = output.transpose(1, 2, 0)
         gt = gt.transpose(1, 2, 0)
 
-        y_output = cv2.cvtColor(output, cv2.COLOR_BGR2YCR_CB)[args.scale:-args.scale, args.scale:-args.scale, :1]
-        y_gt = cv2.cvtColor(gt, cv2.COLOR_BGR2YCR_CB)[args.scale:-args.scale, args.scale:-args.scale, :1]
+        y_out = cv2.cvtColor(output, cv2.COLOR_RGB2YCR_CB)
+        y_out = y_out[args.scale:-args.scale, args.scale:-args.scale, :1]
+        print(y_out.shape)
 
-        psnr = img_psnr(y_gt / 255.0, y_output / 255.0)
-        print('PSNR: {:.2f}'.format(psnr))
+        y_gt = cv2.cvtColor(gt, cv2.COLOR_RGB2YCR_CB)
+        y_gt = y_gt[args.scale:-args.scale, args.scale:-args.scale, :1]
 
-        output = np.array(output * 255.0, ).transpose([1, 2, 0])
-        # output = cv2.cvtColor(output, cv2.COLOR_YCR_CB2BGR)
-        cv2.imwrite("./data/result/" + "res_%04d.png" % index, output)
+        y_out = torch.from_numpy(y_out).to(device)
+        y_gt = torch.from_numpy(y_gt).to(device)
+
+        psnr = img_psnr(y_out / 255.0, y_gt / 255.0)
+
+        print('psnr : %04f \n' % psnr)
+
+        result = cv2.cvtColor(output * 255.0, cv2.COLOR_RGB2BGR).astype(np.uint8)
+        cv2.imwrite('./data/res_%04d.png' % index, result)
